@@ -3,12 +3,13 @@ var client = new Discordie();
 var request = require('request');
 var fs = require('fs');
 var globdata = [];
+var async = require('async');
 
-fs.readFile('cards.json', (err, data) => {
-  if(err) return console.log(err);
-
-  console.log(JSON.parse(data).length);
-})
+fs.readFile(`${__dirname}/cards.json`, (err, data) => {
+    if(err) return console.log(err);
+    console.log(JSON.parse(data).length);
+    globdata = JSON.parse(data);
+});
 
 client.connect({ token: "Mjg2NDI3NTk2MDI2MDE5ODQx.C5gmyA.EWk6RRGeTbV6KHSdc-7-y5DXov8" });
 
@@ -19,17 +20,14 @@ client.Dispatcher.on("GATEWAY_READY", e => {
 
 client.Dispatcher.on("MESSAGE_CREATE", e => {
   console.log(`${e.message.author.username} > ${e.message.content}`);
-  RetFuckYou(e);
-
-  if(e.message.content == 'suh dude')
-    e.message.channel.sendMessage('Suh dude');
+  RetEmbed(e);
 
   if(e.message.content.split(' ')[0] == '!request') PullRandomCard(e);
 });
 
-function RetFuckYou(e){
+function RetEmbed(e){
+  //If the message sent is !ping send an embed containing this info
   if (e.message.content == "!ping") {
-    //e.message.channel.sendMessage(`fuck you ${e.message.author.mention}`);
     e.message.channel.sendMessage('', false, {
       title: 'ABUNAI',
       description: `${e.message.author.username} wanted this done`,
@@ -45,17 +43,25 @@ function RetFuckYou(e){
 }
 
 function PullRandomCard(e) {
-  for(var i = 1; i < 30; i++) {
-    GetCards(i).then((data) => {
-      console.log(`Got data for iterator: ${i}`);
-      for(var card in data.cards) globdata.push(data.cards[card]);
+    var promises = [];
+    for(var i = 1; i < 5; ++i) {
+      console.log(i);
+        promises.push(function(callback) {
+            GetCards(i).then((data) => {
+                console.log(`Data from page ${data[1]}`);
+                for(var card in data[0].cards) globdata.push(data[0].cards[card]);
 
-      fs.writeFile('cards.json', JSON.stringify(globdata, null, 4), (err) => {
-        if(err) return console.error(err);
-        console.log('Fuck off');
-      });
+                callback();
+            });
+        });
+    }
+
+    async.parallel(promises, (err) => {
+        fs.writeFile(`${__dirname}/cards.json`, JSON.stringify(globdata, null, 4), (err) => {
+            if(err) return console.error(err);
+            console.log('Updated the json file');
+        });
     });
-  }
 }
 
 function GetCards(page) {
@@ -73,7 +79,7 @@ function GetCards(page) {
       }
 
       //The data is good
-      return resolve(JSON.parse(body));
+      return resolve([JSON.parse(body), page]);
     });
   });
 }
