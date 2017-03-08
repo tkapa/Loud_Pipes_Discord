@@ -14,11 +14,15 @@ client.connect({ token: "Mjg2NDI3NTk2MDI2MDE5ODQx.C5gmyA.EWk6RRGeTbV6KHSdc-7-y5D
 
 client.Dispatcher.on("GATEWAY_READY", e => {
   console.log("Connected as: " + client.User.username);
+  client.Channels.get('216455483094073344').sendMessage('Suh dude, I\'m back again boiz');
 });
 
 client.Dispatcher.on("MESSAGE_CREATE", e => {
   console.log(`${e.message.author.username} > ${e.message.content}`);
   RetFuckYou(e);
+
+  if(e.message.content == 'suh dude')
+    e.message.channel.sendMessage('Suh dude');
 
   if(e.message.content.split(' ')[0] == '!request') PullRandomCard(e);
 });
