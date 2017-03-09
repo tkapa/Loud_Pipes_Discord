@@ -4,10 +4,12 @@ var request = require('request');
 var fs = require('fs');
 var globdata = [];
 var async = require('async');
+const mtg = require('mtgsdk');
 
-fs.readFile(`${__dirname}/cards.json`, (err, data) => {
+fs.readFile(`${__dirname}/cardList.json`, (err, data) => {
     if(err) return console.log(err);
     console.log(JSON.parse(data).length);
+    console.log(JSON.parse(data)[2].name);
     globdata = JSON.parse(data);
 });
 
@@ -18,68 +20,104 @@ client.Dispatcher.on("GATEWAY_READY", e => {
   client.Channels.get('216455483094073344').sendMessage('Suh dude, I\'m back again boiz');
 });
 
-client.Dispatcher.on("MESSAGE_CREATE", e => {
-  console.log(`${e.message.author.username} > ${e.message.content}`);
-  RetEmbed(e);
+client.Dispatcher.on("MESSAGE_CREATE", sentMessage => {
+  if (sentMessage.message.content == "!randCard") RandomCard(sentMessage);
 
-  if(e.message.content.split(' ')[0] == '!request') PullRandomCard(e);
+
+  if (sentMessage.message.content == "!downloadCardSets")  CompileCards(sentMessage);
+  if (sentMessage.message.content == "!saveCardSets")  GenJSON(sentMessage);
 });
 
-function RetEmbed(e){
-  //If the message sent is !ping send an embed containing this info
-  if (e.message.content == "!ping") {
-    e.message.channel.sendMessage('', false, {
-      title: 'ABUNAI',
-      description: `${e.message.author.username} wanted this done`,
+function RandomCard(sentMessage){
+  console.log(`We have ${globdata.length} cards`)
+  var cardNo = Math.round(Math.random() * globdata.length);
+  console.log(`CardNo is ` + cardNo);
+  var thisCard = globdata[cardNo];
+
+  //Preemptively create the cardEmbed
+  //https://leovoel.github.io/embed-visualizer/ card embed sim
+  var cardEmbed = {
+      author: {
+          name: `A card has been retrieved`
+      },
+      title: `${thisCard.name} ${thisCard.manaCost}`,
+      description: `*${thisCard.flavor}*`,
       timestamp: new Date(),
-      thumbnail: { url: 'http://i.imgur.com/BmgB6h6.png' },
-      color: 0x990000,
-      footer: { text: 'That guy said !ping' },
+      image: {
+          url: `${thisCard.imageUrl}`
+      },
+      color: 0xd3d3d3,
+      footer: {
+          text: `Card art by ${thisCard.artist}`
+      },
       fields: [
-        { name: 'Yeah boi', value: '<:OHGOD:284670299092549632>' }
+          {
+              name: `${thisCard.type}`,
+              value: `${thisCard.originalText}`
+          },
+          {
+              name: `Set: ${thisCard.setName}`,
+              value: `??`
+          }
       ]
+      }
+
+      //Change the color of the embed depending on the card color. the default card color is grey
+      if(thisCard.colors) if(thisCard.colors.length > 0){
+          switch (thisCard.colors[0]) {
+            case 'Blue':
+                    cardEmbed.color = 0xadd8e6;
+                break;
+
+            case 'Green':
+                    cardEmbed.color = 0x00ff00;
+                break;
+
+            case 'Red':
+                    cardEmbed.color = 0xff0000;
+                break;
+
+            case 'Black':
+                    cardEmbed.color = 0x000000;
+                break;
+
+            case 'White':
+                    cardEmbed.color = 0xffffff;
+                break;
+
+            default:
+                    cardEmbed.color = 0xd3d3d3;
+                break;
+          }
+      }
+
+
+  //If the message sent is !ping send an embed containing this info
+  sentMessage.message.channel.sendMessage('', false, cardEmbed);
+}
+
+//FUNCTIONS REQUIRED FOR COMPILING MTG CARDS FROM AN EXTERNAL API
+function CompileCards(e){
+  // Get all cards
+  var i = 0;
+  mtg.card.all() //If you want to search just 1 page -> mtg.card.all({pageSize: 1 })
+  .on('data', function (card) {
+    globdata.push(card);
+    i++;
+    console.log("Card Number: ", i);
     });
+    if(i == globdata.length + 1 )
+      console.log('Done');
   }
-}
 
-function PullRandomCard(e) {
-    var promises = [];
-    for(var i = 1; i < 5; ++i) {
-      console.log(i);
-        promises.push(function(callback) {
-            GetCards(i).then((data) => {
-                console.log(`Data from page ${data[1]}`);
-                for(var card in data[0].cards) globdata.push(data[0].cards[card]);
-
-                callback();
-            });
-        });
+  function GenJSON(e)
+  {
+    if(globdata.length > 0){
+      fs.writeFile(`${__dirname}/cardList.json`, JSON.stringify(globdata, null, 4), (err) => {
+              if(err) return console.error(err);
+              console.log('Updated the json file');
+          });
+      console.log('Finished Collecting data');
     }
-
-    async.parallel(promises, (err) => {
-        fs.writeFile(`${__dirname}/cards.json`, JSON.stringify(globdata, null, 4), (err) => {
-            if(err) return console.error(err);
-            console.log('Updated the json file');
-        });
-    });
-}
-
-function GetCards(page) {
-  return new Promise((resolve, reject) => {
-    console.log(`https://api.magicthegathering.io/v1/cards?page=${page}`);
-    request(`https://api.magicthegathering.io/v1/cards?page=${page}`, (err, resp, body) => {
-      if(err) {
-        console.log(err);
-        return reject();
-      }
-
-      if(resp.statusCode != 200) {
-        console.log(resp.statusCode);
-        return reject();
-      }
-
-      //The data is good
-      return resolve([JSON.parse(body), page]);
-    });
-  });
-}
+    e.message.channel.sendMessage('There is no new data, use command !saveCardSets');
+  }
