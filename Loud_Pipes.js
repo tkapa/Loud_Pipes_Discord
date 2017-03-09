@@ -26,6 +26,7 @@ client.Dispatcher.on("MESSAGE_CREATE", sentMessage => {
         sentMessage.message.channel.sendMessage(`Hello, ${sentMessage.message.author}`);
     if (sentMessage.message.content == "r") RandomCard(sentMessage);
     if(sentMessage.message.content.substring(0,5) == '!find') FindCard(sentMessage);
+    if(sentMessage.message.content.substring(0, 14) == '!buildBooster') BuildBoosterPack(sentMessage);
 
     //Should only be used if the data is needed again
     if (sentMessage.message.content == "!downloadCardSets")  CompileCards(sentMessage);
@@ -39,7 +40,7 @@ function RandomCard(sentMessage){
   console.log(`CardNo is ` + cardNo);
   var thisCard = globdata[cardNo];
 
-  embedCardData(sentMessage, thisCard);
+  EmbedCardData(sentMessage, thisCard);
 }
 
 //Search for a specific cardEmbed
@@ -57,13 +58,19 @@ function FindCard(sentMessage){
     }
 
     if(foundCard)
-        embedSingleCardData(sentMessage, foundCard);
+        EmbedSingleCardData(sentMessage, foundCard);
     else {
         sentMessage.message.channel.sendMessage(`Sorry, ${sentMessage.message.author.mention}, I couldn't find that card`);
     }
 }
 
-function embedSingleCardData(sentMessage, thisCard){
+//Build a bootser pack from a specified setName
+function BuildBoosterPack(sentMessage){
+    //Build a booster pack from a specificed set
+}
+
+//Build an embedded message to display a single card's info
+function EmbedSingleCardData(sentMessage, thisCard){
     //Preemptively create the cardEmbed
     //https://leovoel.github.io/embed-visualizer/ card embed sim
     var cardEmbed = {
@@ -130,6 +137,10 @@ function embedSingleCardData(sentMessage, thisCard){
 
     //If the message sent is !ping send an embed containing this info
     sentMessage.message.channel.sendMessage('', false, cardEmbed);
+}
+
+function EmbedMultipleCards(sentMessage, cardArr){
+    //
 }
 
 //FUNCTIONS REQUIRED FOR COMPILING MTG CARDS FROM AN EXTERNAL API
