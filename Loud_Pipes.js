@@ -6,6 +6,11 @@ var globdata = [];
 var async = require('async');
 const mtg = require('mtgsdk');
 
+var commonCards = [];
+var uncommonCards = [];
+var rareCards = [];
+var mythicRareCards = [];
+
 fs.readFile(`${__dirname}/cardList.json`, (err, data) => {
     if(err) return console.log(err);
     console.log(JSON.parse(data).length);
@@ -13,9 +18,31 @@ fs.readFile(`${__dirname}/cardList.json`, (err, data) => {
     globdata = JSON.parse(data);
 });
 
-client.connect({ token: "Mjg2NDI3NTk2MDI2MDE5ODQx.C5gmyA.EWk6RRGeTbV6KHSdc-7-y5DXov8" });
+client.connect({ token: require(`${__dirname}/auth.json`).token });
 
-    client.Dispatcher.on("GATEWAY_READY", e => {
+client.Dispatcher.on("GATEWAY_READY", e => {
+
+        for(i = 0; i < globdata.length - 1; ++i){
+            switch(globdata[i].rarity){
+                case 'Common':
+                if(globdata[i].types[0] != 'Land')
+                        commonCards.push(globdata[i]);
+                    break;
+
+                case 'Uncommon':
+                        uncommonCards.push(globdata[i]);
+                    break;
+
+                case 'Rare':
+                        rareCards.push(globdata[i]);
+                    break;
+
+                case 'Mythic Rare':
+                        mythicRareCards.push(globdata[i]);
+                    break;
+            }
+        }
+
         client.Channels.get('216455483094073344').sendMessage('***CLANK***');
         client.Channels.get('216455483094073344').sendMessage(`you called?`);
         client.User.setGame('r for card');
@@ -23,14 +50,23 @@ client.connect({ token: "Mjg2NDI3NTk2MDI2MDE5ODQx.C5gmyA.EWk6RRGeTbV6KHSdc-7-y5D
 
 client.Dispatcher.on("MESSAGE_CREATE", sentMessage => {
     if (sentMessage.message.content == "Yo pipes")
-        sentMessage.message.channel.sendMessage(`Hello, ${sentMessage.message.author}`);
-    if (sentMessage.message.content == "r") RandomCard(sentMessage);
-    if(sentMessage.message.content.substring(0,5) == '!find') FindCard(sentMessage);
-    if(sentMessage.message.content.substring(0, 14) == '!buildBooster') BuildBoosterPack(sentMessage);
+        sentMessage.message.channel.sendMessage(`Hello, ${sentMessage.message.author.mention}`);
+    if (sentMessage.message.content == "!pickCard") {
+        RandomCard(sentMessage);
+        sentMessage.message.delete();
+    }
+    if(sentMessage.message.content.substring(0,9) == '!findCard'){
+        FindCard(sentMessage);
+        sentMessage.message.delete();
+    }
+    if(sentMessage.message.content.substring(0, 14) == '!buildBooster'){
+        BuildBoosterPack(sentMessage);
+        sentMessage.message.delete();
+    }
 
     //Should only be used if the data is needed again
-    if (sentMessage.message.content == "!downloadCardSets")  CompileCards(sentMessage);
-    if (sentMessage.message.content == "!saveCardSets")  GenJSON(sentMessage);
+    if (sentMessage.message.content == "PipesAuth-downloadCardSets")  CompileCards(sentMessage);
+    if (sentMessage.message.content == "PipesAuth-saveCardSets")  GenJSON(sentMessage);
 });
 
 //Generates a random card from the database
@@ -40,18 +76,25 @@ function RandomCard(sentMessage){
   console.log(`CardNo is ` + cardNo);
   var thisCard = globdata[cardNo];
 
-  EmbedCardData(sentMessage, thisCard);
+  EmbedSingleCardData(sentMessage, thisCard);
 }
 
 //Search for a specific cardEmbed
 function FindCard(sentMessage){
     var foundCard;
-    //var messageArr = sentMessage.message.content.split('_');
-    var messageArr = sentMessage.message.content.slice(6, sentMessage.message.content.length);
-    console.log(messageArr);
+    var query;
+    var messageArr = sentMessage.message.content.split(' ');
+
+    messageArr.splice(0, 1);
+
+    for(var ele in messageArr) {
+        if(messageArr[ele] == '') messageArr.splice(ele, 1);
+    }
+
+    query = messageArr.join(' ');
 
     for(i = 0; i < globdata.length - 1; ++i){
-        if(globdata[i].name == messageArr){
+        if(globdata[i].name == query){
             foundCard = globdata[i];
             break;
         }
@@ -67,6 +110,48 @@ function FindCard(sentMessage){
 //Build a bootser pack from a specified setName
 function BuildBoosterPack(sentMessage){
     //Build a booster pack from a specificed set
+    //var setWanted = sentMessage.message.content.slice(15, sentMessage.message.content.length);
+    var boosterString;
+    var boosterArray = [];
+    var cardNo;
+    for(i = 0; i<14; ++i){
+        if(i <= 9){
+            cardNo = commonCards[Math.round(Math.random() * commonCards.length)];
+        }
+        else if(i > 9 && i <= 12){
+            cardNo = uncommonCards[Math.round(Math.random() * uncommonCards.length)];
+        }
+        else{
+            if(Math.random() < 0.05){
+                cardNo = mythicRareCards[Math.round(Math.random() * mythicRareCards.length)];
+            }
+            else {
+                cardNo = rareCards[Math.round(Math.random() * rareCards.length)];
+            }
+        }
+        console.log(cardNo.name);
+        boosterArray.push(`**${cardNo.name}** - ${cardNo.rarity}`);
+    }
+    console.log(boosterArray);
+    boosterString = boosterArray.join('\n');
+    //Preemptively create the cardEmbed
+    //https://leovoel.github.io/embed-visualizer/ card embed sim
+    var multiCardEmbed = {
+        author: {
+            name: `New booster has been popped`
+        },
+        title: `${sentMessage.message.author.username} opened a new booster pack`,
+        description: `${boosterString}`,
+        timestamp: new Date(),
+        color: 0xd3d3d3,
+        footer: {
+            icon_url: `${sentMessage.message.author.avatarURL}`,
+            text: `Booster requested by ${sentMessage.message.author.username}`
+        },
+    }
+
+    //If the message sent is !ping send an embed containing this info
+    sentMessage.message.channel.sendMessage('', false, multiCardEmbed);
 }
 
 //Build an embedded message to display a single card's info
@@ -81,11 +166,12 @@ function EmbedSingleCardData(sentMessage, thisCard){
         description: `*No flavour text available*`,
         timestamp: new Date(),
         image: {
-            url: `${thisCard.imageUrl}`
+            url: `*No image available*`
         },
         color: 0xd3d3d3,
         footer: {
-            text: `Card art by ${thisCard.artist}`
+            icon_url: `${sentMessage.message.author.avatarURL}`,
+            text: `Card art by Anonymous`
         },
         fields: [
             {
@@ -103,8 +189,15 @@ function EmbedSingleCardData(sentMessage, thisCard){
         ]
         }
 
+        if(thisCard.imageUrl) cardEmbed.image.url = `${thisCard.imageUrl}`;
         if(thisCard.flavor) cardEmbed.description = `*${thisCard.flavor}*`;
-        if(thisCard.originalText) cardEmbed.fields[0].value = `${thisCard.originalText}`;
+        if(thisCard.artist) cardEmbed.footer.text = `Card art by ${thisCard.artist}`;
+        if(thisCard.originalText){
+            cardEmbed.fields[0].value = `${thisCard.originalText}`;
+        }
+        else{
+            cardEmbed.fields[0].value = `${thisCard.text}`;
+        }
 
         //Change the color of the embed depending on the card color. the default card color is grey
         if(thisCard.colors) if(thisCard.colors.length > 0){
@@ -136,11 +229,46 @@ function EmbedSingleCardData(sentMessage, thisCard){
         }
 
     //If the message sent is !ping send an embed containing this info
-    sentMessage.message.channel.sendMessage('', false, cardEmbed);
+    try{
+        sentMessage.message.channel.sendMessage('', false, cardEmbed);
+    } catch(e){
+        sentMessage.message.channel.sendMessage(`Tell Kapa to fix it`);
+        console.log(cardEmbed);
+        console.log(e);
+    }
 }
 
 function EmbedMultipleCards(sentMessage, cardArr){
-    //
+
+    var cardEmbed = {
+        author: {
+            name: `A card has been retrieved`
+        },
+        title: `??`,
+        description: `*No flavour text available*`,
+        timestamp: new Date(),
+        color: 0xd3d3d3,
+        footer: {
+            icon_url: `${sentMessage.message.author.avatarURL}`,
+            text: `Card art by ${thisCard.artist}`
+        },
+        fields: [
+            {
+                name: `${thisCard.type}`,
+                value: `??`,
+            },
+            {
+                name: `Set:`,
+                value: `${thisCard.setName}`,
+            },
+            {
+                name: `Rarity:`,
+                value: `${thisCard.rarity}`,
+            }
+        ]
+    }
+
+    sentMessage.message.channel.sendMessage('', false, cardEmbed);
 }
 
 //FUNCTIONS REQUIRED FOR COMPILING MTG CARDS FROM AN EXTERNAL API
