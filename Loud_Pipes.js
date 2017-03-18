@@ -1,3 +1,7 @@
+/****************************************\
+        Loud_Pipes By Tylah Kapa
+        <tylahkapa@gmail.com>
+\****************************************/
 var Discordie = require("discordie");
 var client = new Discordie();
 var request = require('request');
@@ -10,11 +14,11 @@ var commonCards = [];
 var uncommonCards = [];
 var rareCards = [];
 var mythicRareCards = [];
+var setUrlData = [{setName: null, setUrl: null}];
 
 fs.readFile(`${__dirname}/cardList.json`, (err, data) => {
     if(err) return console.log(err);
     console.log(JSON.parse(data).length);
-    console.log(JSON.parse(data)[2].name);
     globdata = JSON.parse(data);
 });
 
@@ -42,33 +46,44 @@ client.Dispatcher.on("GATEWAY_READY", e => {
                     break;
             }
         }
-
-        client.Channels.get('216455483094073344').sendMessage('***CLANK***');
-        client.Channels.get('216455483094073344').sendMessage(`you called?`);
-        client.User.setGame('r for card');
+        client.Channels.get('216455483094073344').sendMessage(`You called?`);
+        client.User.setGame('Neck Me Buddi');
+        console.log(client.Channels);
+        console.log(client.Users);
+        console.log(client.Guilds)
 });
 
 client.Dispatcher.on("MESSAGE_CREATE", sentMessage => {
     if (sentMessage.message.content == "Yo pipes")
-        sentMessage.message.channel.sendMessage(`Hello, ${sentMessage.message.author.mention}`);
-    if (sentMessage.message.content == "!pickCard") {
-        RandomCard(sentMessage);
-        sentMessage.message.delete();
-    }
-    if(sentMessage.message.content.substring(0,9) == '!findCard'){
-        FindCard(sentMessage);
-        sentMessage.message.delete();
-    }
-    if(sentMessage.message.content.substring(0, 14) == '!buildBooster'){
-        BuildBoosterPack(sentMessage);
-        sentMessage.message.delete();
-    }
+        sentMessage.message.channel.sendMessage(`Hello, ${sentMessage.message.author.mention}`);         //Greet user
+    if (sentMessage.message.content == "!pickCard") RandomCard(sentMessage);                             //Random a card
+    if(sentMessage.message.content.substring(0,9) == '!findCard')   FindCard(sentMessage);               //Find a specific card
+    if(sentMessage.message.content.substring(0, 14) == '!buildBooster') BuildBoosterPack(sentMessage);   //Build a booster pack
+    if(sentMessage.message.content == "Get over here") JoinVoice(sentMessage);
 
     //Should only be used if the data is needed again
     if (sentMessage.message.content == "PipesAuth-downloadCardSets")  CompileCards(sentMessage);
     if (sentMessage.message.content == "PipesAuth-saveCardSets")  GenJSON(sentMessage);
+    if (sentMessage.message.content == "PipesAuth-scrapeSetData")  CompileSets(sentMessage);
+    if (sentMessage.message.content == "PipesAuth-exportSetData")  ExportSets();
 });
+/*
+    FUNCTIONS USED FOR PALYING MUSIC
+*/
+function JoinVoice(sentMessage){
+    const guild = sentMessage.message.channel.guild;
+    const channelToJoin = sentMessage.message.author.getVoiceChannel(guild);
 
+    if(!channelToJoin){
+        return sentMessage.message.channel.sendMessage(`Sorry, ${sentMessage.message.author.mention}, you need to join a voice channel first!`);
+    }
+
+    channelToJoin.join();
+}
+
+/*
+    FUNCTIONS USED FOR MTG
+*/
 //Generates a random card from the database
 function RandomCard(sentMessage){
   console.log(`We have ${globdata.length} cards`)
@@ -77,6 +92,7 @@ function RandomCard(sentMessage){
   var thisCard = globdata[cardNo];
 
   EmbedSingleCardData(sentMessage, thisCard);
+  sentMessage.message.delete();
 }
 
 //Search for a specific cardEmbed
@@ -105,6 +121,8 @@ function FindCard(sentMessage){
     else {
         sentMessage.message.channel.sendMessage(`Sorry, ${sentMessage.message.author.mention}, I couldn't find that card`);
     }
+
+    sentMessage.message.delete();
 }
 
 //Build a bootser pack from a specified setName
@@ -152,8 +170,12 @@ function BuildBoosterPack(sentMessage){
 
     //If the message sent is !ping send an embed containing this info
     sentMessage.message.channel.sendMessage('', false, multiCardEmbed);
+    sentMessage.message.delete();
 }
 
+/*
+    FUNCTIONS AVAILABLE FOR EMBEDDING CARDS INTO MESSAGES
+*/
 //Build an embedded message to display a single card's info
 function EmbedSingleCardData(sentMessage, thisCard){
     //Preemptively create the cardEmbed
@@ -162,7 +184,7 @@ function EmbedSingleCardData(sentMessage, thisCard){
         author: {
             name: `A card has been retrieved`
         },
-        title: `${thisCard.name} ${thisCard.manaCost}`,
+        title: `${thisCard.name}`,
         description: `*No flavour text available*`,
         timestamp: new Date(),
         image: {
@@ -175,16 +197,16 @@ function EmbedSingleCardData(sentMessage, thisCard){
         },
         fields: [
             {
-                name: `${thisCard.type}`,
-                value: `??`,
+                name: `${thisCard.originalType}`,
+                value: `${thisCard.text}`
             },
             {
                 name: `Set:`,
-                value: `${thisCard.setName}`,
+                value: `${thisCard.setName}`
             },
             {
                 name: `Rarity:`,
-                value: `${thisCard.rarity}`,
+                value: `${thisCard.rarity}`
             }
         ]
         }
@@ -238,6 +260,7 @@ function EmbedSingleCardData(sentMessage, thisCard){
     }
 }
 
+//Build an embedded message for each card in an array
 function EmbedMultipleCards(sentMessage, cardArr){
 
     var cardEmbed = {
@@ -255,15 +278,15 @@ function EmbedMultipleCards(sentMessage, cardArr){
         fields: [
             {
                 name: `${thisCard.type}`,
-                value: `??`,
+                value: `??`
             },
             {
                 name: `Set:`,
-                value: `${thisCard.setName}`,
+                value: `${thisCard.setName}`
             },
             {
                 name: `Rarity:`,
-                value: `${thisCard.rarity}`,
+                value: `${thisCard.rarity}`
             }
         ]
     }
@@ -271,6 +294,9 @@ function EmbedMultipleCards(sentMessage, cardArr){
     sentMessage.message.channel.sendMessage('', false, cardEmbed);
 }
 
+/*
+    FUNCTIONS USED FOR COMPILING A VALID DATABASE OF CARDS
+*/
 //FUNCTIONS REQUIRED FOR COMPILING MTG CARDS FROM AN EXTERNAL API
 function CompileCards(e){
   // Get all cards
@@ -283,16 +309,56 @@ function CompileCards(e){
     });
     if(i == globdata.length + 1 )
       console.log('Done');
-  }
+}
 
-  function GenJSON(e)
-  {
+//Export all cards to a JSON file
+function GenJSON(e) {
     if(globdata.length > 0){
-      fs.writeFile(`${__dirname}/cardList.json`, JSON.stringify(globdata, null, 4), (err) => {
-              if(err) return console.error(err);
-              console.log('Updated the json file');
-          });
+        fs.writeFile(`${__dirname}/cardList.json`, JSON.stringify(globdata, null, 4), (err) => {
+            if(err) return console.error(err);
+            console.log('Updated the json file');
+        });
       console.log('Finished Collecting data');
     }
     e.message.channel.sendMessage('There is no new data, use command !saveCardSets');
+  }
+
+//Find all available sets in the current database
+function CompileSets(sentMessage){
+    console.log(`Finding Sets`);
+
+    for(i = 0; i < globdata.length - 1; ++i){
+        console.log(globdata[i].setName);
+        var setCheck = globdata[i].setName;
+        var foundSet = false;
+
+        for(setIndex = 0; setIndex<setUrlData.length; ++setIndex){
+            console.log(setUrlData[setIndex].setName);
+            if(setCheck == setUrlData[setIndex].setName){
+                foundSet = true;
+                console.log('I found a repeating set');
+            }
+
+            console.log(foundSet);
+        }
+
+        if(!foundSet){
+            setUrlData.push({setName: setCheck, setUrl: null});
+            console.log(setUrlData);
+        }
+
+        console.log(i);
+    }
+      console.log(`Done making setList`);
+  }
+
+//Export all sets found to a JSON file
+function ExportSets(){
+    if(setUrlData.length > 0){
+        fs.writeFile(`${__dirname}/setLogoList.json`, JSON.stringify(setUrlData, null, 4), (err) => {
+                if(err) return console.error(err);
+                console.log('Updated the json file');
+        });
+        console.log('Finished Collecting data');
+    }
   }
