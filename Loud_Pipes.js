@@ -7,7 +7,6 @@ var client = new Discordie();
 var request = require('request');
 var fs = require('fs');
 var globdata = [];
-var async = require('async');
 const mtg = require('mtgsdk');
 
 var commonCards = [];
@@ -16,10 +15,15 @@ var rareCards = [];
 var mythicRareCards = [];
 var setUrlData = [{setName: null, setUrl: null}];
 
-fs.readFile(`${__dirname}/cardList.json`, (err, data) => {
+fs.readFile(`${__dirname}/cardList1.json`, (err, data) => {
     if(err) return console.log(err);
     console.log(JSON.parse(data).length);
     globdata = JSON.parse(data);
+});
+fs.readFile(`${__dirname}/cardList2.json`, (err, data) => {
+    if(err) return console.log(err);
+    console.log(JSON.parse(data).length);
+    globdata.push(JSON.parse(data));
 });
 
 client.connect({ token: require(`${__dirname}/auth.json`).token });
@@ -62,10 +66,12 @@ client.Dispatcher.on("MESSAGE_CREATE", sentMessage => {
     if(sentMessage.message.content == "Get over here") JoinVoice(sentMessage);
 
     //Should only be used if the data is needed again
-    if (sentMessage.message.content == "PipesAuth-downloadCardSets")  CompileCards(sentMessage);
-    if (sentMessage.message.content == "PipesAuth-saveCardSets")  GenJSON(sentMessage);
-    if (sentMessage.message.content == "PipesAuth-scrapeSetData")  CompileSets(sentMessage);
-    if (sentMessage.message.content == "PipesAuth-exportSetData")  ExportSets();
+    if(sentMessage.message.author.id == "142548196089004032"){
+        if (sentMessage.message.content == "PipesAuth-downloadCardSets")  CompileCards(sentMessage);
+        if (sentMessage.message.content == "PipesAuth-saveCardSets")  GenJSON(sentMessage);
+        if (sentMessage.message.content == "PipesAuth-scrapeSetData")  CompileSets(sentMessage);
+        if (sentMessage.message.content == "PipesAuth-exportSetData")  ExportSets();
+    }
 });
 /*
     FUNCTIONS USED FOR PALYING MUSIC
@@ -79,6 +85,10 @@ function JoinVoice(sentMessage){
     }
 
     channelToJoin.join();
+}
+
+function PlayMusic(sentMessage){
+
 }
 
 /*
@@ -313,8 +323,14 @@ function CompileCards(e){
 
 //Export all cards to a JSON file
 function GenJSON(e) {
+    var half_length = Math.ceil(globdata.length/2);
+    var leftSide = globdata.splice(0,half_length);
     if(globdata.length > 0){
-        fs.writeFile(`${__dirname}/cardList.json`, JSON.stringify(globdata, null, 4), (err) => {
+        fs.writeFile(`${__dirname}/cardList1.json`, JSON.stringify(leftSide, null, 4), (err) => {
+            if(err) return console.error(err);
+            console.log('Updated the json file');
+        });
+        fs.writeFile(`${__dirname}/cardList2.json`, JSON.stringify(globdata, null, 4), (err) => {
             if(err) return console.error(err);
             console.log('Updated the json file');
         });
